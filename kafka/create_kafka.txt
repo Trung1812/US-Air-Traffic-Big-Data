@@ -1,0 +1,44 @@
+-- To create a kafka instance on GCP, perform the following steps:
+
+1. Create / Select the GC Project:
+
+Create gcloud projects create totemic-program-442307-i9
+Select: gcloud config set project totemic-program-442307-i9
+
+2. Enable the Managed Kafka, Compute Engine, and Cloud DNS APIs:
+
+gcloud services enable managedkafka.googleapis.com compute.googleapis.com dns.googleapis.com
+
+
+II. Create a cluster
+
+1. Get subnet identifier
+
+gcloud compute networks subnets describe default --region=europe-north1 \
+    --format='value(selfLink)' | sed 's|.*/compute/v1/||'
+
+2. Record these value so you don't have to remember them
+
+export PROJECT_ID=totemic-program-442307-i9
+export SUBNET_PATH=projects/totemic-program-442307-i9/regions/europe-north1/subnetworks/default
+export CLUSTER_ID=uk-air-traffic-kafka-cluster-id
+
+3. To create a cluster, run the following command:
+
+gcloud beta managed-kafka clusters create $CLUSTER_ID \
+    --location=europe-north1 \
+    --cpu=3 \
+    --memory=3GiB \
+    --subnets=$SUBNET_PATH \
+    --async
+
+4. Record value of environment variable OPERATION_ID so you can track progress, \
+cluster creation usually take about 20-30 mins, you can track progress with the \
+following command
+
+export OPERATION_ID=operation-1732097023881-6275543d32f64-411fb605-edb0b0c0
+curl -X GET \
+-H "Authorization: Bearer $(gcloud auth print-access-token)" \
+"https://managedkafka.googleapis.com/v1/projects/$PROJECT_ID/locations/europe-north1/operations/$OPERATION_ID"
+
+5. 
