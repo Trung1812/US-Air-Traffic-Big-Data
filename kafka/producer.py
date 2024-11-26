@@ -4,7 +4,7 @@ import os
 
 from confluent_kafka import Producer
 
-import logging_config
+import logging_config as logging_config
 import utils
 from admin import Admin
 
