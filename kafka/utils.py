@@ -8,3 +8,11 @@ def load_env():
 
     dotenv_path = os.path.join(os.path.dirname(__file__), "../.env")
     load_dotenv(dotenv_path)
+
+def delivery_report(err, msg):
+    if err is not None:
+        print(f"Delivery failed for record {msg.key()}: {err}")
+    else:
+        print(
+            f"Record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}"
+        )

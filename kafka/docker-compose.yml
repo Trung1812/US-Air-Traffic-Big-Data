@@ -121,6 +121,24 @@ services:
       KAFKA_REST_HOST_NAME: 'kafka-rest'
       KAFKA_REST_LISTENERS: 'kafka-rest:8082'
   
+  spark_master:
+    image: bitnami/spark:3
+    container_name: spark_master
+    ports:
+      - 8085:8080
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    volumes:
+      - ./:/home
+      - spark_data:/opt/bitnami/spark/data
+  
+volumes:
+  spark_data:
+
   # spark:
   #   image: docker.io/bitnami/spark:3
   #   container_name: spark_master

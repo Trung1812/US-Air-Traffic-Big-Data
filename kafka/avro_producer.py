@@ -1,6 +1,7 @@
 import logging
 import os
 from uuid import uuid4
+import requests
 
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import (
@@ -9,20 +10,16 @@ from confluent_kafka.serialization import (
     StringSerializer,
 )
 
-import logging_config
+import logging_config as logging_config
 import utils
+from utils import delivery_report
 from admin import Admin
 from producer import ProducerClass
 from schema_registry_client import SchemaClient
 from confluent_kafka import KafkaException
 
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"Delivery failed for record {msg.key()}: {err}")
-    else:
-        print(
-            f"Record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}"
-        )
+from settings import AS_API_KEY
+
 
 class AvroProducer(ProducerClass):
     def __init__(
@@ -53,7 +50,7 @@ class AvroProducer(ProducerClass):
         try:
             if value:
                 byte_value = self.avro_serializer(
-                    value, SerializationContext(topic, MessageField.VALUE)
+                    value, SerializationContext(self.topic, MessageField.VALUE)
                 )
             else:
                 byte_value = None
@@ -74,7 +71,7 @@ class AvroProducer(ProducerClass):
         except Exception as e:
             logging.error(f"Error while sending message: {e}")
 
-if __name__ == "__main__":
+def setting_up():
     # Get the directory where the current script is located
     path = os.path.dirname(os.path.abspath(__file__))
 
@@ -111,60 +108,51 @@ if __name__ == "__main__":
         batch_size=10_00_00,  # in bytes, 1 MB
         waiting_time=10_000,  # in milliseconds, 10 seconds
     )
-         
-    # Read schema files into strings
-    # Define Kafka producer configuration
-    # Sample key and value
-    key = {"flight_id": "12345"}  # Replace with your key structure
-    value = {
-        "flight_date": "2024-11-22",
-        "flight_status": "landed",
-        "departure": {
-            "airport": "LHR",
-            "timezone": "Europe/London",
-            "iata": "LHR",
-            "icao": "EGLL",
-            "terminal": "5",
-            "gate": "A10",
-            "delay": None,
-            "scheduled": "2024-11-22T14:30:00Z",
-            "estimated": "2024-11-22T14:35:00Z",
-            "actual": None,
-            "estimated_runway": None,
-            "actual_runway": None,
-        },
-        "arrival": {
-            "airport": "JFK",
-            "timezone": "America/New_York",
-            "iata": "JFK",
-            "icao": "KJFK",
-            "terminal": "4",
-            "gate": "B20",
-            "baggage": "12",
-            "delay": None,
-            "scheduled": "2024-11-22T18:30:00Z",
-            "estimated": "2024-11-22T18:35:00Z",
-            "actual": None,
-            "estimated_runway": None,
-            "actual_runway": None,
-        },
-        "airline": {
-            "name": "British Airways",
-            "iata": "BA",
-            "icao": "BAW",
-        },
-        "flight": {
-            "number": "BA123",
-            "iata": "BA123",
-            "icao": "BAW123",
-            "codeshared": {},
-        },
+    return producer
+
+if __name__=="__main__":
+    producer = setting_up()
+    #utils.load_dotenv()
+
+    access_key = AS_API_KEY #os.getenv('access_key')
+    if access_key is None:
+        raise ValueError("Missing environment variable: 'access_key'")
+
+    url = "http://api.aviationstack.com/v1/flights"
+
+    params = {
+        "access_key": access_key,
+        #"dep_iata": "LHR",  # Filter flights departing from London Heathrow
+        # OR
+        # "arr_iata": "LGW",  # Filter flights arriving at London Gatwick
+        "dep_country": "United Kingdom",  # Filter by country
+        "flight_status": 'landed',
+        "limit": 5,
     }
+    response = requests.get(url, params=params)
+    response.raise_for_status()  
+    data = response.json()
 
-    try:
-        producer.send_message(key=key, value=value)
-    except Exception as e:
-        print(f"Error message: {e}")
-    producer.commit()
+    topic = 'flights'
 
+    for flight in data['data']:
+        flight_date = flight.get('flight_date', '') or ''
+        flight_number = (flight.get('flight', {}) or {}).get('number', '') or ''
+        departure_scheduled = (flight.get('departure', {}) or {}).get('scheduled', '') or ''
 
+        flight_id = flight_date + '_' + flight_number + '_' + departure_scheduled
+        key = {"flight_id": flight_id}
+        if flight['flight'].get('codeshared') is None:
+            flight['flight']['codeshared'] = {}
+
+        if 'departure' in flight and 'delay' in flight['departure']:
+            flight['departure']['delay'] = str(flight['departure']['delay']) if flight['departure']['delay'] is not None else None
+
+        if 'arrival' in flight and 'delay' in flight['arrival']:
+            flight['arrival']['delay'] = str(flight['arrival']['delay']) if flight['arrival']['delay'] is not None else None
+
+        try:
+            producer.send_message(key=key, value=flight)
+        except Exception as e:
+            print(f"Error message: {e}")
+        producer.commit()

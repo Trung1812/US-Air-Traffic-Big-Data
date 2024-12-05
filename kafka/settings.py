@@ -1,12 +1,12 @@
 import pyspark.sql.types as T
 
-BOOTSTRAP_SERVERS = ['35.220.200.137:9092', '35.220.200.137:9093',]
+BOOTSTRAP_SERVERS = ['localhost:9092', 'localhost:9093',]
 
 TOPIC_WINDOWED_FLIGHT_ID_COUNT = 'flight_counts_windowed'
 
 PRODUCE_TOPIC_FLIGHTS_REQUEST = CONSUME_TOPIC_FLIGHTS_REQUEST = 'flight'
 
-API_KEY = "7a261a4fd48779425e4a75783f089b68"
+AS_API_KEY = "7a261a4fd48779425e4a75783f089b68"
 FLIGHT_URL = "http://api.aviationstack.com/v1/flights"
 
 from pyspark.sql.types import (
@@ -63,4 +63,56 @@ FLIGHT_CODESHARED_SCHEMA = StructType([
     StructField("flight_number", StringType(), nullable=True),
     StructField("flight_iata", StringType(), nullable=True),
     StructField("flight_icao", StringType(), nullable=True)
+])
+
+JSON_SCHEMA = StructType([
+    StructField("flight_date", StringType(), True),
+    StructField("flight_status", StringType(), True),
+    StructField("departure", StructType([
+        StructField("airport", StringType(), True),
+        StructField("timezone", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("terminal", StringType(), True),
+        StructField("gate", StringType(), True),
+        StructField("delay", StringType(), True),
+        StructField("scheduled", StringType(), True),
+        StructField("estimated", StringType(), True),
+        StructField("actual", StringType(), True),
+        StructField("estimated_runway", StringType(), True),
+        StructField("actual_runway", StringType(), True)
+    ]), True),
+    StructField("arrival", StructType([
+        StructField("airport", StringType(), True),
+        StructField("timezone", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("terminal", StringType(), True),
+        StructField("gate", StringType(), True),
+        StructField("baggage", StringType(), True),
+        StructField("delay", StringType(), True),
+        StructField("scheduled", StringType(), True),
+        StructField("estimated", StringType(), True),
+        StructField("actual", StringType(), True),
+        StructField("estimated_runway", StringType(), True),
+        StructField("actual_runway", StringType(), True)
+    ]), True),
+    StructField("airline", StructType([
+        StructField("name", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True)
+    ]), True),
+    StructField("flight", StructType([
+        StructField("number", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("codeshared", StructType([
+            StructField("airline_name", StringType(), True),
+            StructField("airline_iata", StringType(), True),
+            StructField("airline_icao", StringType(), True),
+            StructField("flight_number", StringType(), True),
+            StructField("flight_iata", StringType(), True),
+            StructField("flight_icao", StringType(), True)
+        ]), True)
+    ]), True)
 ])

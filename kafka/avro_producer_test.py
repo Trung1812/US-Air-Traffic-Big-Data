@@ -11,18 +11,11 @@ from confluent_kafka.serialization import (
 
 import logging_config as logging_config
 import utils
+from utils import delivery_report
 from admin import Admin
 from producer import ProducerClass
 from schema_registry_client import SchemaClient
 from confluent_kafka import KafkaException
-
-def delivery_report(err, msg):
-    if err is not None:
-        print(f"Delivery failed for record {msg.key()}: {err}")
-    else:
-        print(
-            f"Record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}"
-        )
 
 class AvroProducer(ProducerClass):
     def __init__(
@@ -126,7 +119,7 @@ if __name__ == "__main__":
             "icao": "EGLL",
             "terminal": "5",
             "gate": "A10",
-            "delay": None,
+            "delay": "10",
             "scheduled": "2024-11-22T14:30:00Z",
             "estimated": "2024-11-22T14:35:00Z",
             "actual": None,
