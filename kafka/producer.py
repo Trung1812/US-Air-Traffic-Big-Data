@@ -4,7 +4,6 @@ import os
 
 from confluent_kafka import Producer
 
-import logging_config as logging_config
 import utils
 from admin import Admin
 
@@ -61,7 +60,7 @@ class ProducerClass:
 
 if __name__ == "__main__":
     utils.load_env()
-    logging_config.configure_logging()
+    utils.configure_logging()
     
     bootstrap_servers = "localhost:9092"#os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
     topic = "flights" #os.environ.get("KAFKA_TOPIC")

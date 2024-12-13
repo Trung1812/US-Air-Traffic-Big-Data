@@ -1,17 +1,13 @@
-import pyspark.sql.types as T
-
-BOOTSTRAP_SERVERS = ['localhost:9092', 'localhost:9093',]
-
-TOPIC_WINDOWED_FLIGHT_ID_COUNT = 'flight_counts_windowed'
-
-PRODUCE_TOPIC_FLIGHTS_REQUEST = CONSUME_TOPIC_FLIGHTS_REQUEST = 'flight'
-
-AS_API_KEY = "7a261a4fd48779425e4a75783f089b68"
-FLIGHT_URL = "http://api.aviationstack.com/v1/flights"
-
 from pyspark.sql.types import (
     StructType, StructField, StringType, DateType, IntegerType, TimestampType
 )
+
+BOOTSTRAP_SERVERS = ['localhost:9092', 'localhost:9093',]
+
+PRODUCE_TOPIC_FLIGHTS = CONSUME_TOPIC_FLIGHTS = 'flight'
+
+AS_API_KEY = "7a261a4fd48779425e4a75783f089b68"
+FLIGHT_URL = "http://api.aviationstack.com/v1/flights"
 
 # Flights Table Schema
 FLIGHT_SCHEMA = StructType([
@@ -46,23 +42,6 @@ FLIGHT_SCHEMA = StructType([
     StructField("airline_id", StringType(), nullable=True),
     StructField("flight_number", StringType(), nullable=True),
     StructField("codeshared_flight_id", StringType(), nullable=True)
-])
-
-# Airlines Table Schema
-AIRLINE_SCHEMA = StructType([
-    StructField("id", StringType(), nullable=False),
-    StructField("name", StringType(), nullable=True),
-    StructField("iata", StringType(), nullable=True),
-    StructField("icao", StringType(), nullable=True)
-])
-
-# Flights Codeshared Table Schema
-FLIGHT_CODESHARED_SCHEMA = StructType([
-    StructField("id", StringType(), nullable=False),
-    StructField("airline_id", StringType(), nullable=True),
-    StructField("flight_number", StringType(), nullable=True),
-    StructField("flight_iata", StringType(), nullable=True),
-    StructField("flight_icao", StringType(), nullable=True)
 ])
 
 JSON_SCHEMA = StructType([

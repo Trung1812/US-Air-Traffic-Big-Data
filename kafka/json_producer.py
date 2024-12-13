@@ -3,17 +3,13 @@ import os
 from uuid import uuid4
 import requests
 
-from confluent_kafka.serialization import (
-    MessageField,
-    SerializationContext,
-    StringSerializer,
-)
+from confluent_kafka.serialization import  StringSerializer
 from confluent_kafka import KafkaException
 
-import logging_config
-from utils import delivery_report
+from utils import *
 from admin import Admin
 from producer import ProducerClass
+import json
 
 
 class JsonProducer(ProducerClass):
@@ -39,8 +35,9 @@ class JsonProducer(ProducerClass):
     def send_message(self, key=None, value=None):
         try:
             byte_value = (
-                self.string_serializer(value) if value else None
+                self.string_serializer(json.dumps(value)) if value else None
             )
+
             self.producer.produce(
                 topic=self.topic,
                 key=self.string_serializer(str(key)),
@@ -62,9 +59,9 @@ class JsonProducer(ProducerClass):
 def setting_up():
     path = os.path.dirname(os.path.abspath(__file__))
 
-    logging_config.configure_logging()
-    bootstrap_servers = "localhost:9092"
-    topic = "flights_json"
+    configure_logging()
+    bootstrap_servers = "localhost:9092" #os.environ['KAFKA_ADDRESS']
+    topic = "flights"
 
     # Create Topic
     admin = Admin(bootstrap_servers)
@@ -84,7 +81,7 @@ def setting_up():
 
 if __name__ == "__main__":
     producer = setting_up()
-
+    """
     access_key = os.getenv("AS_API_KEY")
     if access_key is None:
         raise ValueError("Missing environment variable: 'AS_API_KEY'")
@@ -97,11 +94,13 @@ if __name__ == "__main__":
         "flight_status": "landed",
         "limit": 5,
     }
+
     response = requests.get(url, params=params)
     response.raise_for_status()
-    data = response.json()
-
-    topic = "flights_json"
+    """
+    with open("/Users/phamquangtrung/Desktop/Big-Data-UK-Airline-Data-Analysis/data/test.json") as f:
+        data = json.load(f)
+    topic = "flights"
 
     for flight in data["data"]:
         flight_date = flight.get("flight_date", "") or ""

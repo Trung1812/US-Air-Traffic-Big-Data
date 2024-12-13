@@ -4,7 +4,6 @@ import os
 
 from confluent_kafka import Consumer
 
-import logging_config
 import utils
 
 
@@ -47,11 +46,10 @@ class ConsumerClass:
 
 if __name__ == "__main__":
     utils.load_env()
-    logging_config.configure_logging()
+    utils.configure_logging()
 
-    bootstrap_server = os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
-    topic = os.environ.get("KAFKA_TOPIC")
-    group_id = os.environ.get("KAFKA_GROUP_ID", "my-consumer-group")
-
+    bootstrap_server = "localhost:9092"#os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+    topic = "flights"#os.environ.get("KAFKA_TOPIC")
+    group_id = 0
     consumer = ConsumerClass(bootstrap_server, topic, group_id)
     consumer.consume_messages()

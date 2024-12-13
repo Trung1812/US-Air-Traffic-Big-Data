@@ -1,24 +1,77 @@
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
-import pyspark.sql.types as T
-import os
-from settings import JSON_SCHEMA
-
 from pyspark.sql.types import (
     StructType, StructField, StringType, DateType, IntegerType, TimestampType
 )
+import os
+
+from pyspark.sql.types import (
+    IntegerType, TimestampType
+)
 
 PROJECT_ID = 'totemic-program-442307-i9'
-CONSUME_TOPIC_RIDES_CSV = 'flights'
-KAFKA_ADDRESS= "localhost"
-# KAFKA_BOOTSTRAP_SERVERS = f'{KAFKA_ADDRESS}:9092,{KAFKA_ADDRESS}:9093'
+CONSUME_TOPIC_FLIGHTS = 'flights'
+KAFKA_ADDRESS= "35.240.239.52"
+KAFKA_BOOTSTRAP_SERVERS = f'{KAFKA_ADDRESS}:9092,{KAFKA_ADDRESS}:9093'
 KAFKA_BOOTSTRAP_SERVERS = f'{KAFKA_ADDRESS}:9092'
 
 GCP_GCS_BUCKET = "uk-airline-big-data"
 GCS_STORAGE_PATH = 'gs://' + GCP_GCS_BUCKET + '/realtime2'
 CHECKPOINT_PATH = 'gs://' + GCP_GCS_BUCKET + '/realtime2/checkpoint/'
 CHECKPOINT_PATH_BQ = 'gs://' + GCP_GCS_BUCKET + '/realtime2/checkpoint_bq/'
+
+JSON_SCHEMA = StructType([
+    StructField("flight_date", StringType(), True),
+    StructField("flight_status", StringType(), True),
+    StructField("departure", StructType([
+        StructField("airport", StringType(), True),
+        StructField("timezone", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("terminal", StringType(), True),
+        StructField("gate", StringType(), True),
+        StructField("delay", StringType(), True),
+        StructField("scheduled", StringType(), True),
+        StructField("estimated", StringType(), True),
+        StructField("actual", StringType(), True),
+        StructField("estimated_runway", StringType(), True),
+        StructField("actual_runway", StringType(), True)
+    ]), True),
+    StructField("arrival", StructType([
+        StructField("airport", StringType(), True),
+        StructField("timezone", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("terminal", StringType(), True),
+        StructField("gate", StringType(), True),
+        StructField("baggage", StringType(), True),
+        StructField("delay", StringType(), True),
+        StructField("scheduled", StringType(), True),
+        StructField("estimated", StringType(), True),
+        StructField("actual", StringType(), True),
+        StructField("estimated_runway", StringType(), True),
+        StructField("actual_runway", StringType(), True)
+    ]), True),
+    StructField("airline", StructType([
+        StructField("name", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True)
+    ]), True),
+    StructField("flight", StructType([
+        StructField("number", StringType(), True),
+        StructField("iata", StringType(), True),
+        StructField("icao", StringType(), True),
+        StructField("codeshared", StructType([
+            StructField("airline_name", StringType(), True),
+            StructField("airline_iata", StringType(), True),
+            StructField("airline_icao", StringType(), True),
+            StructField("flight_number", StringType(), True),
+            StructField("flight_iata", StringType(), True),
+            StructField("flight_icao", StringType(), True)
+        ]), True)
+    ]), True)
+])
 
 def read_from_kafka(consume_topic: str):
     # Spark Streaming DataFrame, connect to Kafka topic served at host in bootrap.servers option
@@ -85,33 +138,19 @@ def parse_schema_from_kafka_message(kafka_df, json_schema):
         F.col("flight.codeshared.flight_iata").alias("codeshared_flight_id")
     )
 
-    airline_df = streaming_df.select(
-        F.col("airline.iata").alias("id"),
-        F.col("airline.iata").alias("iata"),
-        F.col("airline.icao").alias("icao"),
-        F.col("airline.name").alias("name"),
-    )
-
-    codeshared_df = streaming_df.select(
-        F.col("flight.codeshared.flight_iata").alias("id"),
-        F.col("flight.codeshared.airline_iata").alias("airline_id"),
-        F.col("flight.codeshared.flight_number").alias("flight_number"),
-        F.col("flight.codeshared.flight_iata").alias("flight_iata"),
-        F.col("flight.codeshared.flight_icao").alias("flight_icao"),
-    )
-
-    return flight_df, airline_df, codeshared_df
+    return flight_df
 
 
 def create_file_write_stream(stream, storage_path, 
                              checkpoint_path='/checkpoint', 
                              trigger="5 seconds", 
                              output_mode="append", 
-                             file_format="parquet"):
+                             file_format="parquet",
+                             partition_by=""):
     write_stream = (stream
                     .writeStream
                     .format(file_format)
-                    .partitionBy("PULocationID")
+                    .partitionBy(partition_by)
                     .option("path", storage_path)
                     .option("checkpointLocation", checkpoint_path)
                     .trigger(processingTime=trigger)
@@ -119,11 +158,14 @@ def create_file_write_stream(stream, storage_path,
 
     return write_stream
 
-def create_file_write_stream_bq(stream,  checkpoint_path='/checkpoint', trigger="5 seconds", output_mode="append"):
+def create_file_write_stream_bq(stream, 
+                                checkpoint_path='/checkpoint', 
+                                trigger="5 seconds", 
+                                output_mode="append"):
     write_stream = (stream
                     .writeStream
                     .format("bigquery")
-                    .option("table", f"{PROJECT_ID}.realtime.rides")
+                    .option("table", f"{PROJECT_ID}.realtimes.flights")
                     .option("checkpointLocation", checkpoint_path)
                     .trigger(processingTime=trigger)
                     .outputMode(output_mode))
@@ -133,33 +175,26 @@ def create_file_write_stream_bq(stream,  checkpoint_path='/checkpoint', trigger=
 if __name__=="__main__":
     os.environ['KAFKA_ADDRESS'] = KAFKA_ADDRESS
     os.environ['GCP_GCS_BUCKET'] = 'uk-airline-big-data'
-    spark = (
-        SparkSession 
-        .builder 
-        .appName("Streaming from Kafka") 
-        .config("spark.streaming.stopGracefullyOnShutdown", True) 
-        .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0')
-        .config("spark.sql.shuffle.partitions", 4)
-        .master("local[*]") 
+
+    spark = SparkSession.builder \
+        .appName("Streaming from Kafka") \
+        .config("spark.streaming.stopGracefullyOnShutdown", True) \
         .getOrCreate()
-    )
-    spark.conf.set
-    spark.sparkContext.setLogLevel('WARN')
+    
+    spark.conf.set("temporaryGcsBucket", "dataproc-staging-asia-southeast1-190992537547-yuriiara")
+    spark.sparkContext.setLogLevel("WARN")
     spark.streams.resetTerminated()
 
-    df_consume_stream = read_from_kafka(consume_topic=CONSUME_TOPIC_RIDES_CSV)
+    df_consume_stream = read_from_kafka(consume_topic=CONSUME_TOPIC_FLIGHTS)
     print(df_consume_stream.printSchema())
 
     # parse streaming data
-    df_flight, df_airline, df_codeshared = parse_schema_from_kafka_message(df_consume_stream, JSON_SCHEMA)
+    df_flight = parse_schema_from_kafka_message(df_consume_stream, JSON_SCHEMA)
     print(df_flight.printSchema())
-    print(df_airline.printSchema())
-    print(df_codeshared.printSchema())
-
 
     # Write to GCS
-    write_stream_flights = create_file_write_stream(df_flight, GCS_STORAGE_PATH, checkpoint_path=CHECKPOINT_PATH)
-    write_stream_airline = create_file_write_stream(df_airline, )
-    write_stream.start()
-
+    write_stream_flights = create_file_write_stream(df_flight, GCS_STORAGE_PATH, checkpoint_path=CHECKPOINT_PATH, partition_by="flight_date")
+    write_stream_flights_bq = create_file_write_stream_bq(df_flight,
+                                                          checkpoint_path=CHECKPOINT_PATH_BQ)
+                                                        
     spark.streams.awaitAnyTermination()
