@@ -1,5 +1,5 @@
 locals {
-  data_lake_bucket = "dtc_data_lake"
+  data_lake_bucket = "uk-airline-big-data"
 }
 
 variable "project_id" {
@@ -25,18 +25,28 @@ variable "storage_class" {
 variable "BQ_DATASET" {
   description = "BigQuery Dataset that raw data (from GCS) will be written to"
   type = string
+
   default = "flightdata"
+
 }
 
 variable "credentials" {
   description = "Path to your GCP credentials file. If not set, then set env-var GOOGLE_APPLICATION_CREDENTIALS"
   type = string
-  default = "your-credentials-key.json"
+  default = "/Users/phamquangtrung/Desktop/Big-Data-UK-Airline-Data-Analysis/totemic-program-442307-i9-cdc0176778ce.json"
+}
+
+variable "zone" {
+  description = "Zone for GCP resources. Choose as per your location: https://cloud.google.com/about/locations"
+  default = "asia-east2-a"
+  type = string
 }
 
 variable "cluster_name" {
   description = "The name for the GKE cluster"
+
   default     = "flight-cleaning-cluster"
+
 }
 
 variable "env_name" {

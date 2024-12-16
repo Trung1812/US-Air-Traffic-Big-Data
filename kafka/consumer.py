@@ -1,104 +1,55 @@
-#NEED TO CHANGE THE SCHEMA AND TABLE CREATION
-from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
-
-import pyspark.sql.types as T
+#DONT TOUCH THIS SCRIPT
+import logging
 import os
-from settings import FLIGHT_SCHEMA, AIRLINE_SCHEMA, FLIGHT_CODESHARED_SCHEMA
 
-PROJECT_ID = 'totemic-program-442307-i9'
-CONSUME_TOPIC_RIDES_CSV = 'flights'
-KAFKA_ADDRESS= "35.220.200.137"
-# KAFKA_BOOTSTRAP_SERVERS = f'{KAFKA_ADDRESS}:9092,{KAFKA_ADDRESS}:9093'
-KAFKA_BOOTSTRAP_SERVERS = f'{KAFKA_ADDRESS}:9092'
+from confluent_kafka import Consumer
 
-GCP_GCS_BUCKET = "uk-airline-big-data"
-GCS_STORAGE_PATH = 'gs://' + GCP_GCS_BUCKET + '/realtime2'
-CHECKPOINT_PATH = 'gs://' + GCP_GCS_BUCKET + '/realtime2/checkpoint/'
-CHECKPOINT_PATH_BQ = 'gs://' + GCP_GCS_BUCKET + '/realtime2/checkpoint_bq/'
+import utils
 
 
-def read_from_kafka(consume_topic: str):
-    # Spark Streaming DataFrame, connect to Kafka topic served at host in bootrap.servers option
-    df_stream = spark \
-        .readStream \
-        .format("kafka") \
-        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-        .option("subscribe", consume_topic) \
-        .option("startingOffsets", "latest") \
-        .option("checkpointLocation", CHECKPOINT_PATH) \
-        .option("failOnDataLoss", "false") \
-        .load()
-    # .option("startingOffsets", "earliest") \
-    return df_stream
+class ConsumerClass:
+    def __init__(self, bootstrap_server, topic, group_id):
+        """Initializes the consumer."""
+        self.bootstrap_server = bootstrap_server
+        self.topic = topic
+        self.group_id = group_id
+        self.consumer = Consumer(
+            {"bootstrap.servers": bootstrap_server, "group.id": self.group_id}
+        )
 
+    def consume_messages(self):
+        """Consume Messages from Kafka."""
+        self.consumer.subscribe([self.topic])
+        logging.info(f"Successfully subscribed to topic: {self.topic}")
 
-def parse_ride_from_kafka_message(df, schema):
-    """ take a Spark Streaming df and parse value col based on <schema>, 
-    return streaming df cols in schema """
-    assert df.isStreaming is True, "DataFrame doesn't receive streaming data"
-
-    df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-
-    # split attributes to nested array in one Column
-    col = F.split(df['value'], ', ')
-
-    # expand col to multiple top-level columns
-    for idx, field in enumerate(schema):
-        df = df.withColumn(field.name, col.getItem(idx).cast(field.dataType))
-    return df.select([field.name for field in schema])
-
-
-def create_file_write_stream(stream, storage_path, 
-                             checkpoint_path='/checkpoint', 
-                             trigger="5 seconds", 
-                             output_mode="append", 
-                             file_format="parquet"):
-    write_stream = (stream
-                    .writeStream
-                    .format(file_format)
-                    .partitionBy("PULocationID")
-                    .option("path", storage_path)
-                    .option("checkpointLocation", checkpoint_path)
-                    .trigger(processingTime=trigger)
-                    .outputMode(output_mode))
-
-    return write_stream
-
-
-def create_file_write_stream_bq(stream,  checkpoint_path='/checkpoint', trigger="5 seconds", output_mode="append"):
-    write_stream = (stream
-                    .writeStream
-                    .format("bigquery")
-                    .option("table", f"{PROJECT_ID}.realtime.rides")
-                    .option("checkpointLocation", checkpoint_path)
-                    .trigger(processingTime=trigger)
-                    .outputMode(output_mode))
-
-    return write_stream
+        try:
+            while True:
+                msg = self.consumer.poll(1.0)
+                if msg is None:
+                    continue
+                if msg.error():
+                    logging.error(f"Consumer error: {msg.error()}")
+                    continue
+                byte_message = msg.value()
+                decoded_message = byte_message.decode("utf-8")
+                logging.info(
+                    f"Byte message: {byte_message}, Type: {type(byte_message)}"
+                )
+                logging.info(
+                    f"Decoded message: {decoded_message}, Type: {type(decoded_message)}"  # noqa: E501
+                )
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.consumer.close()
 
 
 if __name__ == "__main__":
-    os.environ['KAFKA_ADDRESS'] = KAFKA_ADDRESS
-    os.environ['GCP_GCS_BUCKET'] = 'uk-airline-big-data'
-    spark = SparkSession.builder.appName('streaming-examples').getOrCreate()
-    spark.conf.set('temporaryGcsBucket', 'dataproc-temp-asia-east2-285145462114-ku4fpzno')
-    spark.sparkContext.setLogLevel('WARN')
-    spark.streams.resetTerminated()
+    utils.load_env()
+    utils.configure_logging()
 
-    # read_streaming data
-    df_consume_stream = read_from_kafka(consume_topic=CONSUME_TOPIC_RIDES_CSV)
-    print(df_consume_stream.printSchema())
-
-    # parse streaming data
-    df_rides = parse_ride_from_kafka_message(df_consume_stream, FLIGHT_SCHEMA)
-    print(df_rides.printSchema())
-
-    # Write to GCS
-    write_stream = create_file_write_stream(df_rides, GCS_STORAGE_PATH, checkpoint_path=CHECKPOINT_PATH)
-    write_bq = create_file_write_stream_bq(df_rides, checkpoint_path=CHECKPOINT_PATH_BQ)
-
-    write_stream.start()
-    write_bq.start()
-
-    spark.streams.awaitAnyTermination()
+    bootstrap_server = "35.240.239.52:9092"#os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+    topic = "flights"#os.environ.get("KAFKA_TOPIC")
+    group_id = 0
+    consumer = ConsumerClass(bootstrap_server, topic, group_id)
+    consumer.consume_messages()

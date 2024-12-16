@@ -4,7 +4,6 @@ import os
 from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
 from confluent_kafka.schema_registry.error import SchemaRegistryError
 
-import logging_config as logging_config
 import utils
 
 
@@ -69,7 +68,7 @@ class SchemaClient:
 
 if __name__ == "__main__":
     utils.load_env()
-    logging_config.configure_logging()
+    utils.configure_logging()
     topic = os.environ.get("KAFKA_TOPIC")
     schema_url = os.environ.get("SCHEMA_REGISTRY_URL")
     schema_type = "AVRO"

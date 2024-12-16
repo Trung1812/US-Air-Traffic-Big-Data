@@ -4,7 +4,7 @@ from kafka import KafkaConsumer
 
 from ride import Ride
 
-BOOTSTRAP_SERVERS, KAFKA_TOPIC = "localhost:9093", "rides_json"
+BOOTSTRAP_SERVERS, KAFKA_TOPIC = "localhost:9093", "flights"
 
 
 class JsonConsumer:

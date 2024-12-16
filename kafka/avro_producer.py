@@ -9,7 +9,6 @@ from confluent_kafka.serialization import (
     StringSerializer,
 )
 
-import logging_config
 import utils
 from admin import Admin
 from producer import ProducerClass
@@ -81,7 +80,7 @@ if __name__ == "__main__":
     # Load the Avro schema files for key and value
     value_schema_file = os.path.join(path,"flight-value.avsc")     # Update with your value schema file
 
-    logging_config.configure_logging()
+    utils.configure_logging()
     schema_registry_url = "http://localhost:8081"
     bootstrap_servers = "localhost:9092"
     topic = "flights"
@@ -166,5 +165,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error message: {e}")
     producer.commit()
-
 
