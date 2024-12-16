@@ -8,7 +8,7 @@ variable "project_id" {
 }
 
 variable "project" {
-  description = "Your GCP Project ID"
+  description = "My First Project"
 }
 
 variable "region" {
@@ -25,7 +25,9 @@ variable "storage_class" {
 variable "BQ_DATASET" {
   description = "BigQuery Dataset that raw data (from GCS) will be written to"
   type = string
-  default = "flight_data_all"
+
+  default = "flightdata"
+
 }
 
 variable "credentials" {
@@ -42,7 +44,9 @@ variable "zone" {
 
 variable "cluster_name" {
   description = "The name for the GKE cluster"
-  default     = "bigdata-cluster"
+
+  default     = "flight-cleaning-cluster"
+
 }
 
 variable "env_name" {

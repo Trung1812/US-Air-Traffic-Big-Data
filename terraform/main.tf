@@ -74,12 +74,14 @@ resource "google_compute_firewall" "port_rules" {
   allow {
     protocol = "tcp"
     ports    = ["9092", "9093", "9094"]
+
   }
 
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["kafka"]
 
 }
+
 
 resource "google_compute_instance" "kafka-instance" {
   boot_disk {
@@ -193,5 +195,6 @@ resource "google_dataproc_cluster" "dataproc-cluster" {
 
   lifecycle {
     prevent_destroy = false
+
   }
 }
