@@ -10,7 +10,10 @@ from utils import *
 from admin import Admin
 from producer import ProducerClass
 import json
+#from settings import KAFKA_ADDRESS
+import time
 
+KAFKA_ADDRESS = "localhost:29092"
 
 class JsonProducer(ProducerClass):
     def __init__(
@@ -56,12 +59,8 @@ class JsonProducer(ProducerClass):
             logging.error(f"Error while sending message: {e}")
 
 
-def setting_up():
-    path = os.path.dirname(os.path.abspath(__file__))
-
+def setting_up(bootstrap_servers, topic):
     configure_logging()
-    bootstrap_servers = "localhost:29092" #os.environ['KAFKA_ADDRESS']
-    topic = "flights"
 
     # Create Topic
     admin = Admin(bootstrap_servers)
@@ -78,9 +77,53 @@ def setting_up():
     )
     return producer
 
+def request_data(access_key, retries=3, delay=5, **kwargs):
+    kwargs["access_key"] = access_key
+    base_url = "http://api.aviationstack.com/v1/flights"
+    for attempt in range(retries):
+        try:
+            response = requests.get(base_url, params=kwargs)
+            if response.status_code == 429:
+                error_data = response.json()
+                error_type = error_data.get("error", {}).get("type", "Unknown error")
+                if error_type == "usage_limit_reached":
+                    print("Monthly usage limit reached.")
+                    return None
+
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            return response.json()
+        except requests.exceptions.HTTPError as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+        except Exception as e:
+            print(f"Error while fetching data: {e}")
+            break
+    print(f"All attempt failed")
+    return None
+
+def process_data_from_api(flight):
+    flight_date = flight.get("flight_date", "") or ""
+    flight_iata = (flight.get("flight", {}) or {}).get("iata", "") or ""
+    departure_iata = (flight.get("departure", {}) or {}).get("iata", "") or ""
+    arrival_iata = (flight.get("arrival", {}) or {}).get("iata", "") or ""
+
+    flight_id = f"{flight_date}_{flight_iata}_{departure_iata}_{arrival_iata}"
+    key = {"flight_id": flight_id}
+
+    if flight["flight"].get("codeshared") is None:
+        flight["flight"]["codeshared"] = {}
+
+    if "departure" in flight and "delay" in flight["departure"]:
+        flight["departure"]["delay"] = str(flight["departure"]["delay"]) if flight["departure"]["delay"] is not None else None
+
+    if "arrival" in flight and "delay" in flight["arrival"]:
+        flight["arrival"]["delay"] = str(flight["arrival"]["delay"]) if flight["arrival"]["delay"] is not None else None
+    return key, flight
 
 if __name__ == "__main__":
-    producer = setting_up()
+    topic="flights"
+    producer = setting_up(KAFKA_ADDRESS, topic)
     """
     access_key = os.getenv("AS_API_KEY")
     if access_key is None:
@@ -98,7 +141,11 @@ if __name__ == "__main__":
     response = requests.get(url, params=params)
     response.raise_for_status()
     """
-    with open("/Users/phamquangtrung/Desktop/Big-Data-UK-Airline-Data-Analysis/data/test.json") as f:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+    data_dir = os.path.join(root_dir, 'data')
+
+    with open(os.path.join(data_dir, "test.json")) as f:
         data = json.load(f)
     topic = "flights"
 
@@ -106,6 +153,8 @@ if __name__ == "__main__":
         flight_date = flight.get("flight_date", "") or ""
         flight_number = (flight.get("flight", {}) or {}).get("number", "") or ""
         departure_scheduled = (flight.get("departure", {}) or {}).get("scheduled", "") or ""
+        departure_iata = (flight.get("departure", {}) or {}).get("iata", "") or ""
+        arrival_iata = (flight.get("arrival", {}) or {}).get("iata", "") or ""
 
         flight_id = f"{flight_date}_{flight_number}_{departure_scheduled}"
         key = {"flight_id": flight_id}
