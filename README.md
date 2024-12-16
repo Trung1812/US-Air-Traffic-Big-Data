@@ -54,6 +54,6 @@ The objective of this project is to build an automated data pipeline that collec
 
 ## 5. Results
 
-- [Link to dashboard](https://lookerstudio.google.com/reporting/7f728ad5-637e-4796-b240-aa1b7c6b77ce)
+- [Link to dashboard](https://lookerstudio.google.com/reporting/b43aba67-94ae-482a-8801-44c0b2340140)
 
 ![](docs/overview.png)
