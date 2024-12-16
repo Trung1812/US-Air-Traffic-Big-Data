@@ -10,7 +10,7 @@ The objective of this project is to build an automated data pipeline that collec
 
 ## 2. Dataset
 
-- Data is collected from [US Bureau of Transportation Website](https://www.transtats.bts.gov/) and from [Aviation Stack API](https://aviationstack.com). Ở trong project này, dữ liệu được phân tích là dữ liệu từ 01/2019 - 07/2021 của các loại taxi: yellow taxi, green taxi, for-hire vehicles (FHV), for-hire vehicles high volume (FHVHV). 
+- Data is collected from [US Bureau of Transportation Website](https://www.transtats.bts.gov/) and from [Aviation Stack API](https://aviationstack.com). In this project, we analyze US air traffic data from 1987 to 2020 and realtime data from API calls.
 - Dataset size: over 80GB with approximate 200 million records.
 - These are some of the fields in the dataset:
 
