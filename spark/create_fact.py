@@ -115,16 +115,18 @@ class DataProcessor:
 
     
 
-    def create_fact_table_broadcast(self, flights_df, dim_time, dim_airport, dim_airline, dim_delay, dim_cancel):
+    def create_fact_table_sort_merge(self, flights_df, dim_time, dim_airport, 
+                                 dim_airline, dim_delay, dim_cancel):
         """
-        Create the fact table using Spark SQL joins with broadcast optimization.
+        Create the fact table using Spark SQL joins with broadcast optimization for smaller tables
+        and sort-merge join for the large dim_delay table.
 
         Parameters:
         - flights_df: Spark DataFrame representing the Flights table.
         - dim_time: Spark DataFrame representing the Time dimension.
         - dim_airport: Spark DataFrame representing the Airports dimension.
         - dim_airline: Spark DataFrame representing the Airlines dimension.
-        - dim_delay: Spark DataFrame representing the FlightDelays dimension.
+        - dim_delay: Spark DataFrame representing the FlightDelays dimension (large table).
         - dim_cancel: Spark DataFrame representing the FlightCancellations dimension.
 
         Returns:
@@ -147,29 +149,24 @@ class DataProcessor:
         )
 
         # Join with the Time dimension using broadcast
-        fact_table = flights_df.join(broadcast(dim_time), on='FlightDate', how='left')
+        fact_table = flights_df.join(F.broadcast(dim_time), on='FlightDate', how='left')
 
         # Join with Airports dimension for Origin and Destination using broadcast
         fact_table = fact_table \
-            .join(broadcast(dim_airport.withColumnRenamed("AirportID", "OriginAirportID")), on="OriginAirportID", how='left') \
-            .join(broadcast(dim_airport.withColumnRenamed("AirportID", "DestAirportID")), on="DestAirportID", how='left')
+            .join(F.broadcast(dim_airport.withColumnRenamed("AirportID", "OriginAirportID")), on="OriginAirportID", how='left') \
+            .join(F.broadcast(dim_airport.withColumnRenamed("AirportID", "DestAirportID")), on="DestAirportID", how='left')
 
         # Join with Airlines dimension on IATA_CODE_Reporting_Airline using broadcast
-        fact_table = fact_table.join(broadcast(dim_airline), on='IATA_CODE_Reporting_Airline', how='left')
+        fact_table = fact_table.join(F.broadcast(dim_airline), on='IATA_CODE_Reporting_Airline', how='left')
 
-        # Join with FlightDelays dimension using the fact_key
-        fact_table = fact_table.join(
-            broadcast(dim_delay),
-            on='fact_key',
-            how='left'
-        )
+        # Join with FlightCancellations dimension using broadcast
+        fact_table = fact_table.join(F.broadcast(dim_cancel), on='fact_key', how='left')
 
-        # Join with FlightCancellations dimension using the fact_key
-        fact_table = fact_table.join(
-            broadcast(dim_cancel),
-            on='fact_key',
-            how='left'
-        )
+        # Repartition and sort dim_delay for sort-merge join
+        dim_delay = dim_delay.repartitionByRange("fact_key").sortWithinPartitions("fact_key")
+
+        # Perform sort-merge join with dim_delay
+        fact_table = fact_table.join(dim_delay, on='fact_key', how='left')
 
         # Select relevant columns for the fact table
         fact_table = fact_table.select(

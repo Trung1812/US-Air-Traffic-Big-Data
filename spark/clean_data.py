@@ -63,7 +63,7 @@ raw_data = spark.read.csv(file_path, header=True, inferSchema=True)
 cleaned_data = clean_flight_data(raw_data)
 
 # Save the cleaned data back to Google Cloud Storage (optional)
-output_path = "gs://bk9999airline/cleaned_airline_data"
+output_path = "gs://bk9999airline/new_cleaned_airline_data"
 cleaned_data.write.mode("overwrite").parquet(output_path)
 
 print(f"Cleaned data saved to {output_path}")

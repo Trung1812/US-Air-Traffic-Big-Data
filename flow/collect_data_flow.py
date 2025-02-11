@@ -1,4 +1,4 @@
-from prefect import flow
+from prefect import flow, task
 from collect_data import collect_data
 import os
 import time
